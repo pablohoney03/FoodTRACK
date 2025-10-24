@@ -1,14 +1,24 @@
 import sqlite3
+import os
 from datetime import datetime, timedelta
+
+# --- Caminho seguro para o banco (dentro da pasta do usuário) ---
+BASE_DIR = os.path.join(os.path.expanduser("~"), "FoodTrack")  # ex: C:\Users\SeuUsuario\FoodTrack
+DB_PATH = os.path.join(BASE_DIR, "estoque.db")
+
+# garante que a pasta exista
+os.makedirs(BASE_DIR, exist_ok=True)
 
 # conecta ao banco de dados e retorna a conexão
 def conectar():
-    return sqlite3.connect("estoque.db")
+    return sqlite3.connect(DB_PATH)
 
 # cria a tabela se ela não existir
 def criar_tab():
     con = conectar()
     cursor = con.cursor()
+
+    # tabela principal
     cursor.execute(""" 
     CREATE TABLE IF NOT EXISTS produtos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -19,6 +29,18 @@ def criar_tab():
         validade DATE,
         preco_venda REAL,
         preco_compra REAL )""")
+    
+    # lista de usuarios
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario TEXT UNIQUE,
+        senha TEXT)""")
+    
+    # cria o usuario padrão
+    cursor.execute("SELECT * FROM usuarios WHERE usuario = 'admin'")
+    if not cursor.fetchone():
+        cursor.execute("INSERT INTO usuarios (usuario, senha) VALUES ('admin', 'admin')")
 
     con.commit()
     con.close()
@@ -53,7 +75,7 @@ def inserir_item(nome, categoria, quantidade, unidade, validade, preco_venda=Non
     con.close()
 
 def buscar_todos():
-    con = sqlite3.connect("estoque.db")
+    con = conectar()
     cursor = con.cursor()
     cursor.execute("SELECT * FROM produtos")
     registros = cursor.fetchall()
@@ -109,3 +131,28 @@ def buscar_estoque(limite=5):
     con.close()
     return registros
 
+def verificar_login(usuario, senha):
+    # verifica se o login existe
+    con = conectar()
+    cursor = con.cursor()
+    cursor.execute("SELECT * FROM usuarios WHERE usuario = ? AND senha = ?", (usuario, senha))
+    resultado = cursor.fetchone()
+    con.close()
+    return resultado is not None
+
+
+def registrar_usuario(usuario, senha):
+    # tenta registrar um novo usuário, se ele já existir retorna em false
+    con = conectar()
+    cursor = con.cursor()
+
+    # verifica se já existe
+    cursor.execute("SELECT * FROM usuarios WHERE usuario = ?", (usuario,))
+    if cursor.fetchone():
+        con.close()
+        return False
+
+    cursor.execute("INSERT INTO usuarios (usuario, senha) VALUES (?, ?)", (usuario, senha))
+    con.commit()
+    con.close()
+    return True
