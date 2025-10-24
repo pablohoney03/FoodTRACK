@@ -1,11 +1,14 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
+#import customtkinter as ctk
 from datetime import datetime
-from db import criar_tab, inserir_item, buscar_todos, atualizar_item, deletar_item, buscar_validade, buscar_estoque
+from db import criar_tab, inserir_item, buscar_todos, atualizar_item, deletar_item, buscar_validade, buscar_estoque, verificar_login, registrar_usuario
 
 criar_tab()
 modo = None
 item_atualizando = None  
+frame_login = None
+frame_cadastro = None
 
 def centralizar_janela(largura=None, altura=None):
     # centraliza a janela principal na tela
@@ -20,6 +23,89 @@ def centralizar_janela(largura=None, altura=None):
     y = (root.winfo_screenheight() // 2) - (altura_atual // 2)
 
     root.geometry(f"+{x}+{y}")
+
+# --- TELA DE LOGIN ---
+def abrir_login():
+    global frame_login, entry_user, entry_senha, frame_cadastro
+    if frame_login is None:
+        frame_login = tk.Frame(root)
+        tk.Label(frame_login, text="Login", font=("Arial", 14, "bold")).pack(pady=10)
+
+        tk.Label(frame_login, text="Usuário:").pack()
+        entry_user = tk.Entry(frame_login, width=30)
+        entry_user.pack(pady=5)
+
+        tk.Label(frame_login, text="Senha:").pack()
+        entry_senha = tk.Entry(frame_login, width=30, show="*")
+        entry_senha.pack(pady=5)
+
+        tk.Button(frame_login, text="Entrar", width=20, command=tentar_login).pack(pady=10)
+        tk.Button(frame_login, text="Cadastrar novo usuário", width=20, command=abrir_tela_registro).pack(pady=5)
+
+    if frame_cadastro:
+        frame_cadastro.pack_forget()  # esconde registro
+    frame_login.pack(fill="both", expand=True)
+    centralizar_janela(300, 300)
+
+def tentar_login():
+        usuario = entry_user.get().strip()
+        senha = entry_senha.get().strip()
+
+        if not usuario or not senha:
+            messagebox.showerror("Erro", "Preencha todos os campos!")
+            return
+
+        if verificar_login(usuario, senha):
+            messagebox.showinfo("Sucesso", f"Bem-vindo, {usuario}!")
+            frame_login.pack_forget()
+            frame_inicial.pack(fill="both", expand=True)
+        else:
+            messagebox.showerror("Erro", "Usuário ou senha incorretos!")
+
+def abrir_resgistraru():
+        frame_login.pack_forget()
+        abrir_tela_registro()
+
+        tk.Button(frame_login, text="Entrar", width=20, command=tentar_login).pack(pady=10)
+        tk.Button(frame_login, text="Cadastrar novo usuário", command=abrir_tela_registro).pack(pady=5)
+
+        frame_login.pack(fill="both", expand=True)
+        centralizar_janela(300, 300)
+
+def abrir_tela_registro():
+    frame_cadastro_user = tk.Frame(root)
+
+    tk.Label(frame_cadastro_user, text="Cadastro de Usuário", font=("Arial", 14, "bold")).pack(pady=10)
+
+    tk.Label(frame_cadastro_user, text="Usuário:").pack()
+    entry_user = tk.Entry(frame_cadastro_user, width=30)
+    entry_user.pack(pady=5)
+
+    tk.Label(frame_cadastro_user, text="Senha:").pack()
+    entry_senha = tk.Entry(frame_cadastro_user, width=30, show="*")
+    entry_senha.pack(pady=5)
+
+    def registrar():
+        usuario = entry_user.get().strip()
+        senha = entry_senha.get().strip()
+
+        if not usuario or not senha:
+            messagebox.showerror("Erro", "Preencha todos os campos!")
+            return
+
+        if registrar_usuario(usuario, senha):
+            messagebox.showinfo("Sucesso", "Usuário cadastrado com sucesso!")
+            frame_cadastro_user.pack_forget()
+            abrir_login()
+        else:
+            messagebox.showerror("Erro", "Usuário já existe!")
+
+    tk.Button(frame_cadastro_user, text="Cadastrar", width=20, command=registrar).pack(pady=10)
+    tk.Button(frame_cadastro_user, text="Voltar", width=20, command=lambda: (frame_cadastro_user.pack_forget(), abrir_login())).pack()
+
+    frame_login.pack_forget()  # esconde login
+    frame_cadastro_user.pack(fill="both", expand=True)
+    centralizar_janela(300, 300)
 
 
 # === FUNÇÕES DE NAVEGAÇÃO === #
@@ -298,6 +384,6 @@ btn_atualizar.pack(pady=5)
 btn_sair = tk.Button(frame_inicial, text="Sair", width=5, command=root.destroy)
 btn_sair.pack(pady=5)
 
-frame_inicial.pack(fill="both", expand=True)
+abrir_login()
 
 root.mainloop()
