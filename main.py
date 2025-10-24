@@ -7,6 +7,21 @@ criar_tab()
 modo = None
 item_atualizando = None  
 
+def centralizar_janela(largura=None, altura=None):
+    # centraliza a janela principal na tela
+    root.update_idletasks()
+
+    if largura and altura:
+        root.geometry(f"{largura}x{altura}")
+
+    largura_atual = root.winfo_width()
+    altura_atual = root.winfo_height()
+    x = (root.winfo_screenwidth() // 2) - (largura_atual // 2)
+    y = (root.winfo_screenheight() // 2) - (altura_atual // 2)
+
+    root.geometry(f"+{x}+{y}")
+
+
 # === FUNÇÕES DE NAVEGAÇÃO === #
 def abrir_cadastro(acao, dados=None):
     global modo, item_atualizando
@@ -26,6 +41,9 @@ def voltar_inicio():
     root.state('normal')
     root.geometry("350x250")
     root.resizable(True, True)
+
+     # reposiciona a janela no centro da tela
+    centralizar_janela(350, 250)
 
     if 'frame_cadastro' in globals():
         frame_cadastro.pack_forget()
@@ -228,7 +246,7 @@ def destacar_item(item_id):
             root.after(1500, lambda: tree.item(item, tags=()))
             break
 
-# === AÇÕES DE ATUALIZAR E DELETAR === #
+# === ATUALIZAR E DELETAR === #
 def atualizar_selecionado():
     global item_atualizando
     item = tree.selection()
@@ -265,12 +283,7 @@ root = tk.Tk()
 root.title("FoodTRACK")
 root.geometry("350x250")
 
-root.update_idletasks()  
-largura = root.winfo_width()
-altura = root.winfo_height()
-x = (root.winfo_screenwidth() // 2) - (largura // 2)
-y = (root.winfo_screenheight() // 2) - (altura // 2)
-root.geometry(f"+{x}+{y}")
+centralizar_janela()
 
 frame_inicial = tk.Frame(root)
 
