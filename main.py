@@ -131,10 +131,13 @@ def voltar_inicio():
      # reposiciona a janela no centro da tela
     centralizar_janela(350, 250)
 
-    if 'frame_cadastro' in globals():
+    if 'frame_cadastro' in globals() and frame_cadastro:
         frame_cadastro.pack_forget()
-    if 'frame_consulta' in globals():
+    if 'frame_consulta' in globals() and frame_consulta:
         frame_consulta.pack_forget()
+    if 'frame_login' in globals() and frame_login:
+        frame_login.pack_forget()
+
     frame_inicial.pack(fill="both", expand=True)
 
 # === SALVAR (INSERIR OU ATUALIZAR) === #
@@ -262,30 +265,121 @@ def abrir_consulta():
     criar_tela_consulta()
 
 def criar_tela_consulta():
-    global frame_consulta, tree  
+    global frame_consulta, tree
     frame_consulta = tk.Frame(root)
     frame_consulta.pack(fill="both", expand=True)
 
     tk.Label(frame_consulta, text="📦 Estoque", font=("Arial", 12)).pack(pady=10)
 
+    # Painel filtro
+    frame_filtro = tk.LabelFrame(frame_consulta, text="Filtros", padx=10, pady=10)
+    frame_filtro.pack_forget()  # escondido inicialmente
+
+    # Mostrar painel
+    def toggle_filtro():
+        if frame_filtro.winfo_ismapped():
+            frame_filtro.pack_forget()
+        else:
+            frame_filtro.pack(fill="x", padx=10, pady=5, before=tree)  # acima da tabela
+
+    frame_filtro_btn = tk.Frame(frame_consulta)
+    frame_filtro_btn.pack(fill="x", pady=5)
+    tk.Button(frame_filtro_btn, text="Filtrar 🔽", command=toggle_filtro).pack(side="right", padx=20)
+
+    # Variáveis Filtro
+    var_produto = tk.BooleanVar(value=True)
+    var_ingrediente = tk.BooleanVar(value=True)
+
+    tk.Checkbutton(frame_filtro, text="Produto", variable=var_produto).grid(row=0, column=0, sticky="w")
+    tk.Checkbutton(frame_filtro, text="Ingrediente", variable=var_ingrediente).grid(row=0, column=1, sticky="w")
+
+    # Treeview
     colunas = ("id", "nome", "categoria", "quantidade", "unidade", "validade", "preco_venda", "preco_compra")
     tree = ttk.Treeview(frame_consulta, columns=colunas, show="headings", height=10)
-    for col in colunas:
-        tree.heading(col, text=col.capitalize())
-        tree.column(col, width=120, anchor="center")
     tree.pack(fill="both", expand=True, padx=20, pady=10)
 
-    registros = buscar_todos()
-    for row in registros:
-        validade = row[5]
-        if validade:
-            try:
-                data_obj = datetime.strptime(validade, "%d/%m/%Y")  
-                validade = data_obj.strftime("%d/%m/%Y")             
-            except Exception:
-                validade = validade  
-        tree.insert("", tk.END, values=(row[0], row[1], row[2], row[3], row[4], validade, row[6], row[7]))
+    # Ordenação por coluna
+    ordem_colunas = {col: 0 for col in colunas}  # 0: original, 1: crescente, 2: decrescente
 
+    def ordenar_coluna(col):
+        children = tree.get_children()
+        valores_originais = [(tree.set(k, col), k) for k in children]
+
+        if ordem_colunas[col] == 0:  # crescente
+            if col in ("quantidade", "preco_venda", "preco_compra"):
+                valores = sorted(valores_originais, key=lambda t: float(t[0]) if t[0] else 0)
+            elif col == "validade":
+                from datetime import datetime
+                def parse_data(v):
+                    try:
+                        return datetime.strptime(v, "%d/%m/%Y")
+                    except:
+                        return datetime.max
+                valores = sorted(valores_originais, key=lambda t: parse_data(t[0]))
+            else:
+                valores = sorted(valores_originais, key=lambda t: t[0])
+            ordem_colunas[col] = 1
+        elif ordem_colunas[col] == 1:  # decrescente
+            if col in ("quantidade", "preco_venda", "preco_compra"):
+                valores = sorted(valores_originais, key=lambda t: float(t[0]) if t[0] else 0, reverse=True)
+            elif col == "validade":
+                from datetime import datetime
+                def parse_data(v):
+                    try:
+                        return datetime.strptime(v, "%d/%m/%Y")
+                    except:
+                        return datetime.min
+                valores = sorted(valores_originais, key=lambda t: parse_data(t[0]), reverse=True)
+            else:
+                valores = sorted(valores_originais, key=lambda t: t[0], reverse=True)
+            ordem_colunas[col] = 2
+        else:  
+            valores = valores_originais
+            ordem_colunas[col] = 0
+
+        for index, (val, k) in enumerate(valores):
+            tree.move(k, "", index)
+
+    for col in colunas:
+        tree.heading(col, text=col.capitalize(), command=lambda c=col: ordenar_coluna(c))
+        tree.column(col, width=120, anchor="center")
+
+    # Carregar registros com filtro
+    def carregar_registros(*args):
+        categorias = []
+        if var_produto.get():
+            categorias.append("Produto")
+        if var_ingrediente.get():
+            categorias.append("Ingrediente")
+
+        for item in tree.get_children():
+            tree.delete(item)
+
+        registros = buscar_todos()
+        for row in registros:
+            categoria = row[2]
+            if categoria not in categorias:
+                continue
+
+            validade = row[5]
+            if validade:
+                try:
+                    from datetime import datetime
+                    data_obj = datetime.strptime(validade, "%d/%m/%Y")
+                    validade = data_obj.strftime("%d/%m/%Y")
+                except:
+                    validade = validade
+
+            tree.insert("", tk.END, values=(row[0], row[1], row[2], row[3], row[4], validade, row[6], row[7]))
+
+    # Atualiza automaticamente quando filtros mudam
+    var_produto.trace_add("write", carregar_registros)
+    var_ingrediente.trace_add("write", carregar_registros)
+
+    # Carrega tudo inicialmente
+    carregar_registros()
+
+    # BOTÕES PADRÃO 
     frame_botoes = tk.Frame(frame_consulta)
     frame_botoes.pack(pady=10)
 
@@ -293,7 +387,7 @@ def criar_tela_consulta():
     tk.Button(frame_botoes, text="Deletar", width=15, command=deletar_selecionado).pack(side="left", padx=10)
     tk.Button(frame_botoes, text="Voltar", width=15, command=voltar_inicio).pack(side="left", padx=10)
 
-     # ---ALERTAS---
+     # ALERTAS
     try:
         # produtos próximos da validade
         produtos_vencendo = buscar_validade(dias=7)
