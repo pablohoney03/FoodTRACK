@@ -298,62 +298,18 @@ def criar_tela_consulta():
     tree = ttk.Treeview(frame_consulta, columns=colunas, show="headings", height=10)
     tree.pack(fill="both", expand=True, padx=20, pady=10)
 
-    # Ordenação por coluna
     ordem_colunas = {col: 0 for col in colunas}  # 0: original, 1: crescente, 2: decrescente
+    ordem_original = []  # armazenará a ordem inicial
 
-    def ordenar_coluna(col):
-        children = tree.get_children()
-        valores_originais = [(tree.set(k, col), k) for k in children]
-
-        if ordem_colunas[col] == 0:  # crescente
-            if col in ("quantidade", "preco_venda", "preco_compra"):
-                valores = sorted(valores_originais, key=lambda t: float(t[0]) if t[0] else 0)
-            elif col == "validade":
-                from datetime import datetime
-                def parse_data(v):
-                    try:
-                        return datetime.strptime(v, "%d/%m/%Y")
-                    except:
-                        return datetime.max
-                valores = sorted(valores_originais, key=lambda t: parse_data(t[0]))
-            else:
-                valores = sorted(valores_originais, key=lambda t: t[0])
-            ordem_colunas[col] = 1
-        elif ordem_colunas[col] == 1:  # decrescente
-            if col in ("quantidade", "preco_venda", "preco_compra"):
-                valores = sorted(valores_originais, key=lambda t: float(t[0]) if t[0] else 0, reverse=True)
-            elif col == "validade":
-                from datetime import datetime
-                def parse_data(v):
-                    try:
-                        return datetime.strptime(v, "%d/%m/%Y")
-                    except:
-                        return datetime.min
-                valores = sorted(valores_originais, key=lambda t: parse_data(t[0]), reverse=True)
-            else:
-                valores = sorted(valores_originais, key=lambda t: t[0], reverse=True)
-            ordem_colunas[col] = 2
-        else:  
-            valores = valores_originais
-            ordem_colunas[col] = 0
-
-        for index, (val, k) in enumerate(valores):
-            tree.move(k, "", index)
-
-    for col in colunas:
-        tree.heading(col, text=col.capitalize(), command=lambda c=col: ordenar_coluna(c))
-        tree.column(col, width=120, anchor="center")
-
-    # Carregar registros com filtro
     def carregar_registros(*args):
+        nonlocal ordem_original
         categorias = []
         if var_produto.get():
             categorias.append("Produto")
         if var_ingrediente.get():
             categorias.append("Ingrediente")
 
-        for item in tree.get_children():
-            tree.delete(item)
+        tree.delete(*tree.get_children())
 
         registros = buscar_todos()
         for row in registros:
@@ -372,6 +328,55 @@ def criar_tela_consulta():
 
             tree.insert("", tk.END, values=(row[0], row[1], row[2], row[3], row[4], validade, row[6], row[7]))
 
+        ordem_original = tree.get_children()  # salva a ordem inicial
+
+    def ordenar_coluna(col):
+        children = list(tree.get_children())
+        valores_originais = [(tree.set(k, col), k) for k in children]
+
+        if ordem_colunas[col] == 0:  # crescente
+            if col in ("quantidade", "preco_venda", "preco_compra"):
+                valores = sorted(valores_originais, key=lambda t: float(t[0]) if t[0] else 0)
+            elif col == "validade":
+                from datetime import datetime
+                def parse_data(v):
+                    try:
+                        return datetime.strptime(v, "%d/%m/%Y")
+                    except:
+                        return datetime.max
+                valores = sorted(valores_originais, key=lambda t: parse_data(t[0]))
+            else:
+                valores = sorted(valores_originais, key=lambda t: t[0])
+            ordem_colunas[col] = 1
+
+        elif ordem_colunas[col] == 1:  # decrescente
+            if col in ("quantidade", "preco_venda", "preco_compra"):
+                valores = sorted(valores_originais, key=lambda t: float(t[0]) if t[0] else 0, reverse=True)
+            elif col == "validade":
+                from datetime import datetime
+                def parse_data(v):
+                    try:
+                        return datetime.strptime(v, "%d/%m/%Y")
+                    except:
+                        return datetime.min
+                valores = sorted(valores_originais, key=lambda t: parse_data(t[0]), reverse=True)
+            else:
+                valores = sorted(valores_originais, key=lambda t: t[0], reverse=True)
+            ordem_colunas[col] = 2
+
+        else:  # volta à ordem original
+            for index, k in enumerate(ordem_original):
+                tree.move(k, "", index)
+            ordem_colunas[col] = 0
+            return
+
+        for index, (val, k) in enumerate(valores):
+            tree.move(k, "", index)
+
+    for col in colunas:
+        tree.heading(col, text=col.capitalize(), command=lambda c=col: ordenar_coluna(c))
+        tree.column(col, width=120, anchor="center")
+
     # Atualiza automaticamente quando filtros mudam
     var_produto.trace_add("write", carregar_registros)
     var_ingrediente.trace_add("write", carregar_registros)
@@ -379,7 +384,7 @@ def criar_tela_consulta():
     # Carrega tudo inicialmente
     carregar_registros()
 
-    # BOTÕES PADRÃO 
+    # Botões
     frame_botoes = tk.Frame(frame_consulta)
     frame_botoes.pack(pady=10)
 
