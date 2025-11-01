@@ -471,30 +471,45 @@ def criar_tela_consulta():
     # ALERTAS  
     if not alerta_pop:
         try:
-            # produtos próximos da validade
             produtos_vencendo = buscar_validade(dias=7)
-            if produtos_vencendo:
-                nomes = [f"{p[1]} — validade {p[5]}" for p in produtos_vencendo]
-                alerta = "\n".join(nomes)
-                messagebox.showwarning(
-                    "Aviso de Validade!",
-                    f"Os seguintes produtos estão próximos da validade:\n\n{alerta}"
-                )
-
-            # produtos com estoque baixo
             produtos_baixoe = buscar_estoque()
-            if produtos_baixoe:
-                nomes = [f"{p[1]} — {p[3]} {p[4]}" for p in produtos_baixoe]
-                alerta = "\n".join(nomes)
-                messagebox.showwarning(
-                    "Estoque Baixo!",
-                    f"Os seguintes produtos estão com estoque baixo:\n\n{alerta}"
-                )
+
+            if not produtos_vencendo and not produtos_baixoe:
+                alerta_pop = True
+                return
 
             alerta_pop = True
+            alertas = []
 
+            if produtos_vencendo:
+                alertas.append("🔴 Próximos da validade (7 dias):")
+                alertas += [f" • {p[1]} — validade {p[5]}" for p in produtos_vencendo]
+                alertas.append("")
+
+            if produtos_baixoe:
+                alertas.append("🟠 Estoque baixo:")
+                alertas += [f" • {p[1]} — {p[3]} {p[4]}" for p in produtos_baixoe]
+
+            texto_alerta = "\n".join(alertas)
+
+            popup = tk.Toplevel(root)
+            popup.title("Avisos de Estoque")
+            popup.geometry("400x280")
+            x = root.winfo_x() + (root.winfo_width() // 2) - 200
+            y = root.winfo_y() + (root.winfo_height() // 2) - 140
+            popup.geometry(f"+{x}+{y}")
+            popup.transient(root)
+
+            tk.Label(popup, text="⚠️ Avisos", font=("Arial", 12, "bold")).pack(pady=(10, 5))
+            txt = tk.Text(popup, wrap="word", height=12, padx=10, pady=5)
+            txt.insert("1.0", texto_alerta)
+            txt.config(state="disabled")
+            txt.pack(fill="both", expand=True, padx=10)
+            tk.Button(popup, text="Fechar", command=popup.destroy, width=12).pack(pady=10)
         except Exception as e:
             print("Erro ao verificar alertas:", e)
+
+
 
     frame_consulta.pack(fill="both", expand=True)
 
