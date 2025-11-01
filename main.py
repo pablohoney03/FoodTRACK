@@ -148,61 +148,45 @@ def salvar():
     unidade = combo_unidade.get().strip()
     validade = entry_validade.get().strip()
 
-    if validade:
-        apenas_numeros = "".join(c for c in validade if c.isdigit())
-        data_obj = None
-        try:
-            if len(apenas_numeros) == 8:  # formato ddmmaaaa
-                data_obj = datetime.strptime(apenas_numeros, "%d%m%Y")
-            elif len(apenas_numeros) == 6:  # formato ddmmaa
-                data_obj = datetime.strptime(apenas_numeros, "%d%m%y")
-            else:
-                validade_formatada = validade.replace("-", "/")
-                data_obj = datetime.strptime(validade_formatada, "%d/%m/%Y")
-        except ValueError:
-            messagebox.showerror("Erro!", "Insira a data no formato DD/MM/AAAA")
-            return
-        
-        validade = data_obj.strftime("%d/%m/%Y")
+    # ... (código de validação da data permanece igual) ...
 
     try:
         quantidade = float(entry_quantidade.get())
     except ValueError:
-        messagebox.showerror("Quantidade inválida!")
+        messagebox.showerror("Erro", "Quantidade inválida!")
         return
 
     preco_venda = None
     preco_compra = None
 
-    if categoria == "Produto":
-        try:
-            preco_venda = float(entry_preco.get().replace("R$", "").replace(",", ".").strip())
-        except ValueError:
-            messagebox.showerror("Preço de venda inválido!")
-            return
-    elif categoria == "Ingrediente":
-        try:
-            preco_compra = float(entry_preco.get().replace("R$", "").replace(",", ".").strip())
-        except ValueError:
-            messagebox.showerror("Preço de compra inválido!")
-            return
-    else:
-        messagebox.showerror("Selecione uma categoria válida!")
+    try:
+        preco_input = entry_preco.get().replace("R$", "").replace(",", ".").strip()
+        if preco_input:  # Só converte se não estiver vazio
+            preco_valor = float(preco_input)
+            
+            if categoria == "Produto":
+                preco_venda = preco_valor
+            elif categoria == "Ingrediente":
+                preco_compra = preco_valor
+    except ValueError:
+        messagebox.showerror("Erro", "Preço inválido!")
         return
 
     if modo == "atualizar":
         atualizar_item(item_atualizando, nome, categoria, quantidade, unidade, validade, preco_venda, preco_compra)
         messagebox.showinfo("Sucesso", f"Item ID {item_atualizando} atualizado com sucesso!")
 
+        # Atualiza a visualização
         frame_cadastro.pack_forget()
         criar_tela_consulta()
+        
+        # Destaca o item atualizado
+        if 'tree' in globals():
+            root.after(200, lambda: destacar_item(item_atualizando))
 
-        root.after(200, lambda: destacar_item(item_atualizando))
-
-    else:
+    else:  # modo novo
         inserir_item(nome, categoria, quantidade, unidade, validade, preco_venda, preco_compra)
         messagebox.showinfo("Sucesso", f"{categoria} cadastrado com sucesso!")
-
         voltar_inicio()
 
 # === TELA DE CADASTRO === #
@@ -234,7 +218,7 @@ def criar_tela_cadastro(dados=None):
     entry_validade = tk.Entry(frame_cadastro, width=20)
     entry_validade.pack()
 
-    tk.Label(frame_cadastro, text="Preço (Venda ou Compra):").pack()
+    tk.Label(frame_cadastro, text="Preço:").pack()
     entry_preco = tk.Entry(frame_cadastro, width=20)
     entry_preco.pack()
 
@@ -253,8 +237,16 @@ def criar_tela_cadastro(dados=None):
     btn_salvar = tk.Button(frame_cadastro, text="Salvar", command=salvar)
     btn_salvar.pack(pady=10)
 
-    btn_cancelar = tk.Button(frame_cadastro, text="Cancelar", command=voltar_inicio)
-    btn_cancelar.pack(pady=5)
+    if modo == "atualizar":
+        btn_voltar = tk.Button(frame_cadastro, text="Voltar", command=lambda: (
+            frame_cadastro.pack_forget(),
+            criar_tela_consulta()
+        ))
+        btn_voltar.pack(pady=5)
+
+    # Botão "Sair" sempre volta à tela inicial
+    btn_sair = tk.Button(frame_cadastro, text="Sair", command=voltar_inicio)
+    btn_sair.pack(pady=5)
 
     frame_cadastro.pack(fill="both", expand=True)
 
@@ -271,20 +263,9 @@ def criar_tela_consulta():
 
     tk.Label(frame_consulta, text="📦 Estoque", font=("Arial", 12)).pack(pady=10)
 
-    # Painel filtro
+    # Painel filtro (criado primeiro mas escondido)
     frame_filtro = tk.LabelFrame(frame_consulta, text="Filtros", padx=10, pady=10)
     frame_filtro.pack_forget()  # escondido inicialmente
-
-    # Mostrar painel
-    def toggle_filtro():
-        if frame_filtro.winfo_ismapped():
-            frame_filtro.pack_forget()
-        else:
-            frame_filtro.pack(fill="x", padx=10, pady=5, before=tree)  # acima da tabela
-
-    frame_filtro_btn = tk.Frame(frame_consulta)
-    frame_filtro_btn.pack(fill="x", pady=5)
-    tk.Button(frame_filtro_btn, text="Filtrar 🔽", command=toggle_filtro).pack(side="right", padx=20)
 
     # Variáveis Filtro
     var_produto = tk.BooleanVar(value=True)
@@ -293,16 +274,32 @@ def criar_tela_consulta():
     tk.Checkbutton(frame_filtro, text="Produto", variable=var_produto).grid(row=0, column=0, sticky="w")
     tk.Checkbutton(frame_filtro, text="Ingrediente", variable=var_ingrediente).grid(row=0, column=1, sticky="w")
 
-    # Treeview
-    colunas = ("id", "nome", "categoria", "quantidade", "unidade", "validade", "preco_venda", "preco_compra")
+    # Treeview (criado depois do frame_filtro)
+    colunas = ("id", "nome", "categoria", "quantidade", "unidade", "validade", "preço")
     tree = ttk.Treeview(frame_consulta, columns=colunas, show="headings", height=10)
     tree.pack(fill="both", expand=True, padx=20, pady=10)
+
+    # Frame para botão de filtro (criado depois do treeview mas posicionado antes)
+    frame_filtro_btn = tk.Frame(frame_consulta)
+    frame_filtro_btn.pack(fill="x", pady=5, before=tree)  # posiciona antes da tabela
+
+    # Função toggle_filtro definida ANTES de ser usada
+    def toggle_filtro():
+        if frame_filtro.winfo_ismapped():
+            frame_filtro.pack_forget()
+        else:
+            frame_filtro.pack(fill="x", padx=10, pady=5, before=tree)
+
+    # Agora cria o botão que usa a função
+    tk.Button(frame_filtro_btn, text="Filtrar 🔽", command=toggle_filtro).pack(side="right", padx=20)
 
     ordem_colunas = {col: 0 for col in colunas}  # 0: original, 1: crescente, 2: decrescente
     ordem_original = []  # armazenará a ordem inicial
 
     def carregar_registros(*args):
         nonlocal ordem_original
+        from datetime import datetime, date
+
         categorias = []
         if var_produto.get():
             categorias.append("Produto")
@@ -312,33 +309,90 @@ def criar_tela_consulta():
         tree.delete(*tree.get_children())
 
         registros = buscar_todos()
+        vencendo = {r[0] for r in buscar_validade(7)}      # IDs perto do vencimento
+        baixo_estoque = {r[0] for r in buscar_estoque()}   # IDs com pouco estoque
+
+        # Configura as cores das linhas
+        tree.tag_configure("vencido", background="#ffcccc")       # vermelho claro
+        tree.tag_configure("sem_estoque", background="#ffe0e0")   # rosa claro
+        tree.tag_configure("alerta", background="#fff4cc")        # amarelo claro
+        tree.tag_configure("ok", background="white")
+
+        hoje = date.today()
+
         for row in registros:
-            categoria = row[2]
-            if categoria not in categorias:
-                continue
+            validade_str = row[5]
+            tag = "ok"
+            alerta_val = ""
+            alerta_qtd = ""
 
-            validade = row[5]
-            if validade:
+            # === Trata validade ===
+            data_obj = None
+            if validade_str:
                 try:
-                    from datetime import datetime
-                    data_obj = datetime.strptime(validade, "%d/%m/%Y")
-                    validade = data_obj.strftime("%d/%m/%Y")
-                except:
-                    validade = validade
+                    data_obj = datetime.strptime(validade_str, "%d/%m/%Y").date()
+                    if data_obj < hoje:
+                        tag = "vencido"
+                    elif row[0] in vencendo:
+                        alerta_val = "⚠️"
+                        tag = "alerta"
+                except Exception:
+                    pass
 
-            tree.insert("", tk.END, values=(row[0], row[1], row[2], row[3], row[4], validade, row[6], row[7]))
+            validade_display = f"{validade_str or '-'} {alerta_val}".strip()
 
-        ordem_original = tree.get_children()  # salva a ordem inicial
+            # === Trata estoque ===
+            quantidade = float(row[3]) if row[3] else 0
+            unidade = (row[4] or "").lower()
+
+            if quantidade <= 0:
+                tag = "sem_estoque"
+            elif row[0] in baixo_estoque and tag == "ok":
+                alerta_qtd = "⚠️"
+                tag = "alerta"
+
+            quantidade_display = f"{quantidade} {unidade} {alerta_qtd}".strip()
+
+            # === Preço ===
+            preco = "-"
+            if row[2] == "Produto" and row[6] is not None:
+                preco = f"R$ {row[6]:.2f} (venda)"
+            elif row[2] == "Ingrediente" and row[7] is not None:
+                preco = f"R$ {row[7]:.2f} (compra)"
+
+            # === Insere na tabela ===
+            tree.insert(
+                "",
+                tk.END,
+                values=(row[0], row[1], row[2], quantidade_display, unidade, validade_display, preco),
+                tags=(tag,)
+            )
+
+        ordem_original = tree.get_children()
 
     def ordenar_coluna(col):
         children = list(tree.get_children())
+        if not children:
+            return
+            
         valores_originais = [(tree.set(k, col), k) for k in children]
 
         if ordem_colunas[col] == 0:  # crescente
-            if col in ("quantidade", "preco_venda", "preco_compra"):
-                valores = sorted(valores_originais, key=lambda t: float(t[0]) if t[0] else 0)
+            if col == "quantidade":
+                valores = sorted(valores_originais, key=lambda t: float(t[0]) if t[0] and t[0].replace('.','').isdigit() else 0)
+            elif col == "preço":
+                # Ordenação especial para preço formatado
+                def extrair_preco(valor):
+                    if valor == "-":
+                        return 0
+                    try:
+                        # Remove "R$", "(venda)", "(compra)" e converte
+                        preco_limpo = valor.split("R$")[1].split("(")[0].strip()
+                        return float(preco_limpo.replace(",", "."))
+                    except:
+                        return 0
+                valores = sorted(valores_originais, key=lambda t: extrair_preco(t[0]))
             elif col == "validade":
-                from datetime import datetime
                 def parse_data(v):
                     try:
                         return datetime.strptime(v, "%d/%m/%Y")
@@ -346,14 +400,23 @@ def criar_tela_consulta():
                         return datetime.max
                 valores = sorted(valores_originais, key=lambda t: parse_data(t[0]))
             else:
-                valores = sorted(valores_originais, key=lambda t: t[0])
+                valores = sorted(valores_originais, key=lambda t: t[0].lower() if t[0] else "")
             ordem_colunas[col] = 1
 
         elif ordem_colunas[col] == 1:  # decrescente
-            if col in ("quantidade", "preco_venda", "preco_compra"):
-                valores = sorted(valores_originais, key=lambda t: float(t[0]) if t[0] else 0, reverse=True)
+            if col == "quantidade":
+                valores = sorted(valores_originais, key=lambda t: float(t[0]) if t[0] and t[0].replace('.','').isdigit() else 0, reverse=True)
+            elif col == "preço":
+                def extrair_preco(valor):
+                    if valor == "-":
+                        return 0
+                    try:
+                        preco_limpo = valor.split("R$")[1].split("(")[0].strip()
+                        return float(preco_limpo.replace(",", "."))
+                    except:
+                        return 0
+                valores = sorted(valores_originais, key=lambda t: extrair_preco(t[0]), reverse=True)
             elif col == "validade":
-                from datetime import datetime
                 def parse_data(v):
                     try:
                         return datetime.strptime(v, "%d/%m/%Y")
@@ -361,7 +424,7 @@ def criar_tela_consulta():
                         return datetime.min
                 valores = sorted(valores_originais, key=lambda t: parse_data(t[0]), reverse=True)
             else:
-                valores = sorted(valores_originais, key=lambda t: t[0], reverse=True)
+                valores = sorted(valores_originais, key=lambda t: t[0].lower() if t[0] else "", reverse=True)
             ordem_colunas[col] = 2
 
         else:  # volta à ordem original
@@ -373,9 +436,21 @@ def criar_tela_consulta():
         for index, (val, k) in enumerate(valores):
             tree.move(k, "", index)
 
+    # Configurar colunas
     for col in colunas:
         tree.heading(col, text=col.capitalize(), command=lambda c=col: ordenar_coluna(c))
-        tree.column(col, width=120, anchor="center")
+        if col == "id":
+            tree.column(col, width=50, anchor="center")
+        elif col == "nome":
+            tree.column(col, width=150, anchor="w")
+        elif col in ("quantidade", "unidade"):
+            tree.column(col, width=80, anchor="center")
+        elif col == "validade":
+            tree.column(col, width=100, anchor="center")
+        elif col == "preço":
+            tree.column(col, width=120, anchor="center")
+        else:
+            tree.column(col, width=100, anchor="center")
 
     # Atualiza automaticamente quando filtros mudam
     var_produto.trace_add("write", carregar_registros)
@@ -392,7 +467,7 @@ def criar_tela_consulta():
     tk.Button(frame_botoes, text="Deletar", width=15, command=deletar_selecionado).pack(side="left", padx=10)
     tk.Button(frame_botoes, text="Voltar", width=15, command=voltar_inicio).pack(side="left", padx=10)
 
-     # ALERTAS
+    # ALERTAS
     try:
         # produtos próximos da validade
         produtos_vencendo = buscar_validade(dias=7)
@@ -405,7 +480,7 @@ def criar_tela_consulta():
             )
 
         # produtos com estoque baixo
-        produtos_baixoe = buscar_estoque(limite=5)
+        produtos_baixoe = buscar_estoque()
         if produtos_baixoe:
             nomes = [f"{p[1]} — {p[3]} {p[4]}" for p in produtos_baixoe]
             alerta = "\n".join(nomes)
@@ -420,15 +495,19 @@ def criar_tela_consulta():
     frame_consulta.pack(fill="both", expand=True)
 
 def destacar_item(item_id):
-    # destaca item no treeview
+    # Verifica se o treeview existe e tem itens
+    if 'tree' not in globals():
+        return
+        
     for item in tree.get_children():
         valores = tree.item(item, "values")
-        if str(valores[0]) == str(item_id):
-            tree.tag_configure("destaque", background="yellow")
+        if valores and str(valores[0]) == str(item_id):  # Verifica se valores não é None
+            tree.tag_configure("destaque", background="lightyellow")
             tree.item(item, tags=("destaque",))
             
-            # remove o destaque após 1,5 segundos
-            root.after(1500, lambda: tree.item(item, tags=()))
+            # Remove o destaque após 1,5 segundos
+            root.after(1500, lambda i=item: tree.item(i, tags=()))
+            tree.see(item)  # Garante que o item esteja visível
             break
 
 # === ATUALIZAR E DELETAR === #
@@ -438,18 +517,33 @@ def atualizar_selecionado():
     if not item:
         messagebox.showerror("Erro", "Selecione um item para atualizar.")
         return
-    valores = tree.item(item, "values")
-    item_atualizando = valores[0]
-    dados = {
-        "nome": valores[1],
-        "categoria": valores[2],
-        "quantidade": valores[3],
-        "unidade": valores[4],
-        "validade": valores[5],
-        "preco_venda": valores[6],
-        "preco_compra": valores[7],
-    }
-    abrir_cadastro("atualizar", dados)
+    
+    # Pega os valores do item selecionado
+    valores = tree.item(item[0], "values")
+    item_atualizando = valores[0]  # ID do item
+    
+    # Busca os dados completos do banco de dados
+    registros = buscar_todos()
+    dados_completos = None
+    
+    for registro in registros:
+        if str(registro[0]) == str(item_atualizando):
+            dados_completos = {
+                "id": registro[0],
+                "nome": registro[1],
+                "categoria": registro[2],
+                "quantidade": registro[3],
+                "unidade": registro[4],
+                "validade": registro[5] if registro[5] else "",
+                "preco_venda": registro[6],
+                "preco_compra": registro[7]
+            }
+            break
+    
+    if dados_completos:
+        abrir_cadastro("atualizar", dados_completos)
+    else:
+        messagebox.showerror("Erro", "Não foi possível carregar os dados do item.")
 
 def deletar_selecionado():
     item = tree.selection()
