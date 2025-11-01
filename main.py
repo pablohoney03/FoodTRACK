@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox
 #import customtkinter as ctk
 from datetime import datetime
 from db import criar_tab, inserir_item, buscar_todos, atualizar_item, deletar_item, buscar_validade, buscar_estoque, verificar_login, registrar_usuario
+from utils import centralizar_janela, destacar_item, mostrar_alertas, formatar_quantidade, formatar_validade, normalizar_data
 
 criar_tab()
 modo = None
@@ -10,20 +11,6 @@ item_atualizando = None
 frame_login = None
 frame_cadastro = None
 alerta_pop = False
-
-def centralizar_janela(largura=None, altura=None):
-    # centraliza a janela principal na tela
-    root.update_idletasks()
-
-    if largura and altura:
-        root.geometry(f"{largura}x{altura}")
-
-    largura_atual = root.winfo_width()
-    altura_atual = root.winfo_height()
-    x = (root.winfo_screenwidth() // 2) - (largura_atual // 2)
-    y = (root.winfo_screenheight() // 2) - (altura_atual // 2)
-
-    root.geometry(f"+{x}+{y}")
 
 # --- TELA DE LOGIN ---
 def abrir_login():
@@ -46,7 +33,7 @@ def abrir_login():
     if frame_cadastro:
         frame_cadastro.pack_forget()  # esconde registro
     frame_login.pack(fill="both", expand=True)
-    centralizar_janela(300, 300)
+    centralizar_janela(root, 300, 300)
 
 def tentar_login():
         usuario = entry_user.get().strip()
@@ -71,7 +58,7 @@ def abrir_resgistraru():
         tk.Button(frame_login, text="Cadastrar novo usuário", command=abrir_tela_registro).pack(pady=5)
 
         frame_login.pack(fill="both", expand=True)
-        centralizar_janela(300, 300)
+        centralizar_janela(root, 300, 300)
 
 def abrir_tela_registro():
     frame_cadastro_user = tk.Frame(root)
@@ -106,7 +93,7 @@ def abrir_tela_registro():
 
     frame_login.pack_forget()  # esconde login
     frame_cadastro_user.pack(fill="both", expand=True)
-    centralizar_janela(300, 300)
+    centralizar_janela(root, 300, 300)
 
 
 # === FUNÇÕES DE NAVEGAÇÃO === #
@@ -130,7 +117,7 @@ def voltar_inicio():
     root.resizable(True, True)
 
      # reposiciona a janela no centro da tela
-    centralizar_janela(350, 250)
+    centralizar_janela(root, 350, 250)
 
     if 'frame_cadastro' in globals() and frame_cadastro:
         frame_cadastro.pack_forget()
@@ -147,9 +134,7 @@ def salvar():
     nome = entry_nome.get().strip()
     categoria = combo_categoria.get()
     unidade = combo_unidade.get().strip()
-    validade = entry_validade.get().strip()
-
-    # ... (código de validação da data permanece igual) ...
+    validade = normalizar_data(entry_validade.get().strip())
 
     try:
         quantidade = float(entry_quantidade.get())
@@ -183,7 +168,7 @@ def salvar():
         
         # Destaca o item atualizado
         if 'tree' in globals():
-            root.after(200, lambda: destacar_item(item_atualizando))
+            root.after(200, lambda: destacar_item(tree, root, item_atualizando))
 
     else:  # modo novo
         inserir_item(nome, categoria, quantidade, unidade, validade, preco_venda, preco_compra)
@@ -469,66 +454,10 @@ def criar_tela_consulta():
     tk.Button(frame_botoes, text="Voltar", width=15, command=voltar_inicio).pack(side="left", padx=10)
 
     # ALERTAS  
-    if not alerta_pop:
-        try:
-            produtos_vencendo = buscar_validade(dias=7)
-            produtos_baixoe = buscar_estoque()
-
-            if not produtos_vencendo and not produtos_baixoe:
-                alerta_pop = True
-                return
-
-            alerta_pop = True
-            alertas = []
-
-            if produtos_vencendo:
-                alertas.append("🔴 Próximos da validade (7 dias):")
-                alertas += [f" • {p[1]} — validade {p[5]}" for p in produtos_vencendo]
-                alertas.append("")
-
-            if produtos_baixoe:
-                alertas.append("🟠 Estoque baixo:")
-                alertas += [f" • {p[1]} — {p[3]} {p[4]}" for p in produtos_baixoe]
-
-            texto_alerta = "\n".join(alertas)
-
-            popup = tk.Toplevel(root)
-            popup.title("Avisos de Estoque")
-            popup.geometry("400x280")
-            x = root.winfo_x() + (root.winfo_width() // 2) - 200
-            y = root.winfo_y() + (root.winfo_height() // 2) - 140
-            popup.geometry(f"+{x}+{y}")
-            popup.transient(root)
-
-            tk.Label(popup, text="⚠️ Avisos", font=("Arial", 12, "bold")).pack(pady=(10, 5))
-            txt = tk.Text(popup, wrap="word", height=12, padx=10, pady=5)
-            txt.insert("1.0", texto_alerta)
-            txt.config(state="disabled")
-            txt.pack(fill="both", expand=True, padx=10)
-            tk.Button(popup, text="Fechar", command=popup.destroy, width=12).pack(pady=10)
-        except Exception as e:
-            print("Erro ao verificar alertas:", e)
-
-
+    mostrar_alertas(root)
 
     frame_consulta.pack(fill="both", expand=True)
-
-def destacar_item(item_id):
-    # Verifica se o treeview existe e tem itens
-    if 'tree' not in globals():
-        return
-        
-    for item in tree.get_children():
-        valores = tree.item(item, "values")
-        if valores and str(valores[0]) == str(item_id):  # Verifica se valores não é None
-            tree.tag_configure("destaque", background="lightyellow")
-            tree.item(item, tags=("destaque",))
-            
-            # Remove o destaque após 1,5 segundos
-            root.after(1500, lambda i=item: tree.item(i, tags=()))
-            tree.see(item)  # Garante que o item esteja visível
-            break
-
+    
 # === ATUALIZAR E DELETAR === #
 def atualizar_selecionado():
     global item_atualizando
@@ -579,9 +508,7 @@ def deletar_selecionado():
 # === JANELA PRINCIPAL === #
 root = tk.Tk()
 root.title("FoodTRACK")
-root.geometry("350x250")
-
-centralizar_janela()
+centralizar_janela(root, 300, 250)
 
 frame_inicial = tk.Frame(root)
 
