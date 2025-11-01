@@ -9,6 +9,7 @@ modo = None
 item_atualizando = None  
 frame_login = None
 frame_cadastro = None
+alerta_pop = False
 
 def centralizar_janela(largura=None, altura=None):
     # centraliza a janela principal na tela
@@ -257,7 +258,7 @@ def abrir_consulta():
     criar_tela_consulta()
 
 def criar_tela_consulta():
-    global frame_consulta, tree
+    global frame_consulta, alerta_pop, tree
     frame_consulta = tk.Frame(root)
     frame_consulta.pack(fill="both", expand=True)
 
@@ -467,30 +468,33 @@ def criar_tela_consulta():
     tk.Button(frame_botoes, text="Deletar", width=15, command=deletar_selecionado).pack(side="left", padx=10)
     tk.Button(frame_botoes, text="Voltar", width=15, command=voltar_inicio).pack(side="left", padx=10)
 
-    # ALERTAS
-    try:
-        # produtos próximos da validade
-        produtos_vencendo = buscar_validade(dias=7)
-        if produtos_vencendo:
-            nomes = [f"{p[1]} — validade {p[5]}" for p in produtos_vencendo]
-            alerta = "\n".join(nomes)
-            messagebox.showwarning(
-                "Aviso de Validade!",
-                f"Os seguintes produtos estão próximos da validade:\n\n{alerta}"
-            )
+    # ALERTAS  
+    if not alerta_pop:
+        try:
+            # produtos próximos da validade
+            produtos_vencendo = buscar_validade(dias=7)
+            if produtos_vencendo:
+                nomes = [f"{p[1]} — validade {p[5]}" for p in produtos_vencendo]
+                alerta = "\n".join(nomes)
+                messagebox.showwarning(
+                    "Aviso de Validade!",
+                    f"Os seguintes produtos estão próximos da validade:\n\n{alerta}"
+                )
 
-        # produtos com estoque baixo
-        produtos_baixoe = buscar_estoque()
-        if produtos_baixoe:
-            nomes = [f"{p[1]} — {p[3]} {p[4]}" for p in produtos_baixoe]
-            alerta = "\n".join(nomes)
-            messagebox.showwarning(
-                "Estoque Baixo!",
-                f"Os seguintes produtos estão com estoque baixo:\n\n{alerta}"
-            )
+            # produtos com estoque baixo
+            produtos_baixoe = buscar_estoque()
+            if produtos_baixoe:
+                nomes = [f"{p[1]} — {p[3]} {p[4]}" for p in produtos_baixoe]
+                alerta = "\n".join(nomes)
+                messagebox.showwarning(
+                    "Estoque Baixo!",
+                    f"Os seguintes produtos estão com estoque baixo:\n\n{alerta}"
+                )
 
-    except Exception as e:
-        print("Erro ao verificar alertas:", e)
+            alerta_pop = True
+
+        except Exception as e:
+            print("Erro ao verificar alertas:", e)
 
     frame_consulta.pack(fill="both", expand=True)
 
