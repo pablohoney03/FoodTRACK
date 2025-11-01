@@ -123,13 +123,40 @@ def buscar_validade(dias=7):
 def buscar_estoque(limite=5):
     con = conectar()
     cursor = con.cursor()
-    cursor.execute("""
-        SELECT * FROM produtos
-        WHERE quantidade <= ?
-    """, (limite,))
+    cursor.execute("SELECT * FROM produtos")
     registros = cursor.fetchall()
     con.close()
-    return registros
+
+    limites = {
+        "un": 5,
+        "kg": 1,
+        "g": 500,
+        "l": 2,
+        "ml": 500, 
+    }
+    baixo_estoque = []
+
+    for row in registros:
+        nome = row[1]
+        quantidade = float(row[3]) if row[3] else 0
+        unidade = (row[4] or "").lower()
+
+        if unidade not in limites:
+            continue
+        limite = limites[unidade]
+
+        # Normaliza unidades menores
+        if unidade == "g":
+            quantidade /= 1000
+            limite = limites["g"] / 1000
+        elif unidade == "ml":
+            quantidade /= 1000
+            limite = limites["ml"] / 1000
+
+        if quantidade <= limite:
+            baixo_estoque.append(row)
+
+    return baixo_estoque
 
 def verificar_login(usuario, senha):
     # verifica se o login existe
